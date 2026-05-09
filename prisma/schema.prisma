@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  password  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Debt {
+  id             String   @id @default(cuid())
+  type           String   // SPayLater, SFinancing, CarLoan, MARA
+  balance        Float
+  monthlyPayment Float
+  interestRate   Float?
+  startDate      DateTime
+  endDate        DateTime?
+  status         String   @default("active") // active, paid, frozen
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  payments       PaymentCalendar[]
+  dashboardEntries MonthlyDashboard[]
+}
+
+model PaymentCalendar {
+  id        String   @id @default(cuid())
+  debtId    String?
+  debt      Debt?    @relation(fields: [debtId], references: [id])
+  dueDate   DateTime
+  amount    Float
+  status    String   @default("pending") // pending, paid, late
+  paidDate  DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GrabEntry {
+  id        String   @id @default(cuid())
+  date      DateTime
+  platform  String   // Grab, Bolt, inDrive
+  hours     Float
+  gross     Float
+  commission Float?
+  fuel      Float?
+  tolls     Float?
+  net       Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MonthlyDashboard {
+  id              String   @id @default(cuid())
+  month           DateTime @unique // First day of month
+  salary          Float    @default(0)
+  grabIncome      Float    @default(0)
+  freelanceIncome Float    @default(0)
+  totalCommitments Float   @default(0)
+  food            Float    @default(0)
+  fuelTolls       Float    @default(0)
+  grabCosts       Float    @default(0)
+  surplus         Float?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  debts           Debt[]
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  name        String
+  cost        Float
+  renewalDate DateTime?
+  category    String?  // tools, entertainment, utilities
+  rating      String   @default("Essential") // Essential, Nice-to-have, Unused
+  active      Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refreshToken      String?
+  accessToken       String?
+  expiresAt         Int?
+  tokenType         String?
+  scope             String?
+  idToken           String?
+  sessionState      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
