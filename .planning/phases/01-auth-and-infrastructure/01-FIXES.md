@@ -23,7 +23,7 @@ This makes `type` default to `"email"` for credential accounts when Better Auth 
 4. Started dev server on port 3001 (port 3000 was occupied by a stale process)
 5. Created account via `POST /api/auth/signup/email`:
    - Email: danial@danialsanusi.com
-   - Password: (configured during setup — dana12345)
+   - Password: (configured during setup, change in production)
    - Name: Danial
 6. **Correct endpoint:** `/api/auth/signup/email` (not `/api/auth/sign-up/email`)
 

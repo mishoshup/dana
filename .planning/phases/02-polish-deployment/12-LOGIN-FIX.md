@@ -43,7 +43,7 @@ Using `window.location.href` ensures a **full page navigation** (not a client-si
 ```bash
 curl -s -X POST http://localhost:3000/api/auth/sign-in/email \
   -H "Content-Type: application/json" \
-  -d '{"email":"danial@danialsanusi.com","password":"dana12345"}'
+  -d '{"email":"you","password":"your-password"}'
 # Returns 200 with token and set-cookie header
 ```
 
