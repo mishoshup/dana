@@ -9,8 +9,8 @@ export const user = sqliteTable("User", {
   name: text("name"),
   image: text("image"),
   password: text("password"),
-  createdAt: text("createdAt").notNull().default("CURRENT_TIMESTAMP"),
-  updatedAt: text("updatedAt").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const session = sqliteTable("Session", {
@@ -19,11 +19,11 @@ export const session = sqliteTable("Session", {
   userId: text("userId")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  expiresAt: text("expiresAt").notNull(),
+  expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
   ipAddress: text("ipAddress"),
   userAgent: text("userAgent"),
-  createdAt: text("createdAt").notNull().default("CURRENT_TIMESTAMP"),
-  updatedAt: text("updatedAt").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const account = sqliteTable("Account", {
@@ -37,21 +37,21 @@ export const account = sqliteTable("Account", {
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
   idToken: text("idToken"),
-  accessTokenExpiresAt: text("accessTokenExpiresAt"),
-  refreshTokenExpiresAt: text("refreshTokenExpiresAt"),
+  accessTokenExpiresAt: integer("accessTokenExpiresAt", { mode: "timestamp_ms" }),
+  refreshTokenExpiresAt: integer("refreshTokenExpiresAt", { mode: "timestamp_ms" }),
   scope: text("scope"),
   password: text("password"),
-  createdAt: text("createdAt").notNull().default("CURRENT_TIMESTAMP"),
-  updatedAt: text("updatedAt").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const verification = sqliteTable("Verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: text("expiresAt").notNull(),
-  createdAt: text("createdAt").notNull().default("CURRENT_TIMESTAMP"),
-  updatedAt: text("updatedAt").notNull(),
+  expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
 });
 
 // ─── App Tables ────────────────────────────────────────────────────────────

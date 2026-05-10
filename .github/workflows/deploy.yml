@@ -34,6 +34,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
       
-      - name: Apply D1 migrations
-        run: npx wrangler d1 execute dana-db --remote --file=prisma/migrations/*/migration.sql
-        continue-on-error: true
+

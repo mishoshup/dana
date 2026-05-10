@@ -42,5 +42,6 @@
       "zone_name": "danialsanusi.com",
       "custom_domain": true
     }
-  ]
+  ],
+  "workers_dev": true
 }
