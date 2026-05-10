@@ -1,36 +1,46 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"main": ".open-next/worker.js",
-	"name": "dana",
-	"compatibility_date": "2026-05-09",
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
-	"assets": {
-		"directory": ".open-next/assets",
-		"binding": "ASSETS"
-	},
-	"services": [
-		{
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "dana"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "NEXT_INC_CACHE_R2_BUCKET",
-			"bucket_name": "dana-opennext-cache"
-		}
-	],
-	"images": {
-		"binding": "IMAGES"
-	},
-	"d1_databases": [
-		{
-			"binding": "dana_db",
-			"database_name": "dana-db",
-			"database_id": "f6cbe705-0cc7-4860-ba34-9a739262d60d"
-		}
-	]
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "dana",
+  "compatibility_date": "2026-05-09",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "dana"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "dana-opennext-cache"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  },
+  "d1_databases": [
+    {
+      "binding": "dana_db",
+      "database_name": "dana-db",
+      "database_id": "f6cbe705-0cc7-4860-ba34-9a739262d60d"
+    }
+  ],
+  "define": {
+    "process.env.NEXTJS_ENV": "\"production\""
+  },
+  "routes": [
+    {
+      "pattern": "dana.danialsanusi.com",
+      "zone_name": "danialsanusi.com",
+      "custom_domain": true
+    }
+  ]
 }
