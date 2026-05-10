@@ -1,4 +1,5 @@
-import { auth } from "@/lib/auth";
+import { getAuth } from "@/lib/auth";
+import type { Session } from "@/lib/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -15,6 +16,7 @@ export class UnauthorizedError extends Error {
  */
 export async function getSession() {
   try {
+    const auth = await getAuth();
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -45,7 +47,7 @@ export async function requireAuth() {
  * If auth succeeded, returns [null, session].
  */
 export async function requireAuthTuple(): Promise<
-  [NextResponse, null] | [null, typeof auth.$Infer.Session]
+  [NextResponse, null] | [null, Session]
 > {
   const result = await requireAuth();
   if (result instanceof NextResponse) {

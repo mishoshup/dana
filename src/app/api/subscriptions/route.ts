@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { subscription } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -10,6 +10,7 @@ export async function GET() {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const subscriptions = await db.select().from(subscription)
       .orderBy(desc(subscription.cost))
       .all();
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const body = await req.json();
 
     const parsed = subscriptionSchema.safeParse(body);

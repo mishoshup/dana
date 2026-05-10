@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { monthlyDashboard, grabEntry as grabEntryTable, paymentCalendar as paymentCalendarTable, debt as debtTable, subscription } from "@/db/schema";
 import { eq, and, gte, lte, lt, asc, desc, count, sum } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const { searchParams } = new URL(req.url);
 
     const parsed = dashboardQuerySchema.safeParse({

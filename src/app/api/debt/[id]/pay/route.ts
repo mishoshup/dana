@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { debt as debtTable, paymentCalendar as paymentCalendarTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -12,6 +12,7 @@ export async function POST(
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const { id } = await params;
     const body: { amount: string; date?: string; notes?: string } = await req.json();
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { paymentCalendar as paymentCalendarTable, debt as debtTable } from "@/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -10,6 +10,7 @@ export async function GET() {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const payments = await db.select({
       id: paymentCalendarTable.id,
       debtId: paymentCalendarTable.debtId,
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const body = await req.json();
 
     const parsed = paymentSchema.safeParse(body);
@@ -81,6 +83,7 @@ export async function PATCH(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const body = await req.json();
 
     const parsed = paymentUpdateSchema.safeParse(body);

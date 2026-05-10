@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { debt as debtTable, paymentCalendar as paymentCalendarTable, grabEntry as grabEntryTable } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
   const type = searchParams.get("type");
 
   try {
+    const db = await getDb();
     switch (type) {
       case "debts": {
         const debts = await db.select({

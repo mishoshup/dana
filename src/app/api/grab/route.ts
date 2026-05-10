@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { grabEntry as grabEntryTable } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -10,6 +10,7 @@ export async function GET() {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const entries = await db.select().from(grabEntryTable)
       .orderBy(desc(grabEntryTable.date))
       .limit(50)
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const body = await req.json();
 
     const parsed = grabSchema.safeParse(body);

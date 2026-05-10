@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/local";
+import { getDb } from "@/db/unified";
 import { debt as debtTable, paymentCalendar as paymentCalendarTable } from "@/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
@@ -10,6 +10,7 @@ export async function GET() {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const debtList = await db.select().from(debtTable)
       .orderBy(desc(debtTable.balance))
       .all();
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   try {
+    const db = await getDb();
     const body = await req.json();
 
     const parsed = debtSchema.safeParse(body);
