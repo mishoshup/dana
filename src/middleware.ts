@@ -39,8 +39,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Page routes → check for session cookie
-  const sessionCookie = request.cookies.get("dana.session_token");
+  // Page routes → check for session cookie (with or without __Secure- prefix on HTTPS)
+  const sessionCookie = request.cookies.get("dana.session_token")
+    || request.cookies.get("__Secure-dana.session_token");
   if (!sessionCookie?.value) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
