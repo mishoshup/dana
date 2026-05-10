@@ -43,6 +43,9 @@ next-env.d.ts
 # OpenNext
 .open-next
 
+# Playwright test results
+test-results/
+
 # wrangler files
 .wrangler
 .dev.vars*
