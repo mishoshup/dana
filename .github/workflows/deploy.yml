@@ -24,6 +24,8 @@ jobs:
       
       - name: Build (OpenNext)
         run: npx opennextjs-cloudflare build
+        env:
+          DATABASE_URL: "file:///tmp/dana-ci.db"
       
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
