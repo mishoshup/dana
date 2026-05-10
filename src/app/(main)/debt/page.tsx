@@ -367,15 +367,17 @@ export default function DebtTracker() {
                         if (!open) setPayAmount("");
                       }}
                     >
-                      <DialogTrigger className="flex-1">
+                      <DialogTrigger
+                      render={
                         <Button
                           size="sm"
                           disabled={debt.status === "paid"}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 text-xs"
+                          className="flex-1 w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 text-xs"
                         >
                           <CreditCard size={12} className="mr-1.5" /> Log Payment
                         </Button>
-                      </DialogTrigger>
+                      }
+                    />
                       <DialogContent className="bg-zinc-950 border-zinc-800 text-white w-[95vw] max-w-sm rounded-xl">
                         <DialogHeader>
                           <DialogTitle className="text-white text-sm">

@@ -23,6 +23,7 @@ interface DashboardData {
 }
 
 interface DebtSummary {
+  id: string;
   type: string;
   balance: number;
   monthlyPayment: number;
@@ -196,7 +197,7 @@ export default function Dashboard() {
 
               return (
                 <div
-                  key={d.type}
+                  key={d.id}
                   className={`rounded-xl border ${colorMap[debtColorKey] || "border-zinc-800 bg-zinc-900/50"} p-3`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
