@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { subscription } from "@/db/schema";
+import { desc } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { subscriptionSchema } from "@/lib/validation";
 
@@ -9,14 +10,12 @@ export async function GET() {
   if (authError) return authError;
 
   try {
-    const subscriptions = await prisma.subscription.findMany({
-      orderBy: { cost: "desc" },
-    });
+    const subscriptions = await db.select().from(subscription)
+      .orderBy(desc(subscription.cost))
+      .all();
     return NextResponse.json(subscriptions);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -43,23 +42,21 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
-    const subscription = await prisma.subscription.create({
-      data: {
-        name: data.name,
-        cost: data.cost,
-        category: data.category ?? null,
-        rating: data.rating,
-        active: data.active,
-        renewalDate: data.renewalDate ? new Date(data.renewalDate) : null,
-        notes: data.notes ?? null,
-      },
-    });
+    const [newSubscription] = await db.insert(subscription).values({
+      id: crypto.randomUUID(),
+      name: data.name,
+      cost: data.cost,
+      category: data.category ?? null,
+      rating: data.rating,
+      active: data.active,
+      renewalDate: data.renewalDate ? new Date(data.renewalDate).toISOString() : null,
+      notes: data.notes ?? null,
+      updatedAt: new Date().toISOString(),
+    }).returning();
 
-    return NextResponse.json(subscription, { status: 201 });
+    return NextResponse.json(newSubscription, { status: 201 });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { grabEntry as grabEntryTable } from "@/db/schema";
+import { desc } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { grabSchema } from "@/lib/validation";
 
@@ -9,15 +10,13 @@ export async function GET() {
   if (authError) return authError;
 
   try {
-    const entries = await prisma.grabEntry.findMany({
-      orderBy: { date: "desc" },
-      take: 50,
-    });
+    const entries = await db.select().from(grabEntryTable)
+      .orderBy(desc(grabEntryTable.date))
+      .limit(50)
+      .all();
     return NextResponse.json(entries);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -44,24 +43,22 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
-    const entry = await prisma.grabEntry.create({
-      data: {
-        date: new Date(data.date),
-        platform: data.platform,
-        hours: data.hours,
-        gross: data.gross,
-        commission: data.commission ?? 0,
-        fuel: data.fuel ?? 0,
-        tolls: data.tolls ?? 0,
-        net: data.net ?? null,
-        notes: data.notes ?? null,
-      },
-    });
+    const [entry] = await db.insert(grabEntryTable).values({
+      id: crypto.randomUUID(),
+      date: new Date(data.date).toISOString(),
+      platform: data.platform,
+      hours: data.hours,
+      gross: data.gross,
+      commission: data.commission ?? 0,
+      fuel: data.fuel ?? 0,
+      tolls: data.tolls ?? 0,
+      net: data.net ?? null,
+      notes: data.notes ?? null,
+      updatedAt: new Date().toISOString(),
+    }).returning();
     return NextResponse.json(entry, { status: 201 });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

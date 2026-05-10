@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { debt as debtTable, paymentCalendar as paymentCalendarTable, grabEntry as grabEntryTable } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 
 function toCSV(rows: Record<string, unknown>[]): string {
@@ -32,27 +34,27 @@ export async function GET(req: NextRequest) {
   try {
     switch (type) {
       case "debts": {
-        const debts = await prisma.debt.findMany({
-          orderBy: { createdAt: "desc" },
-          select: {
-            type: true,
-            balance: true,
-            monthlyPayment: true,
-            interestRate: true,
-            status: true,
-            startDate: true,
-            endDate: true,
-            notes: true,
-          },
-        });
+        const debts = await db.select({
+          type: debtTable.type,
+          balance: debtTable.balance,
+          monthlyPayment: debtTable.monthlyPayment,
+          interestRate: debtTable.interestRate,
+          status: debtTable.status,
+          startDate: debtTable.startDate,
+          endDate: debtTable.endDate,
+          notes: debtTable.notes,
+        })
+          .from(debtTable)
+          .orderBy(desc(debtTable.createdAt))
+          .all();
         const rows = debts.map((d) => ({
           type: d.type,
           balance: d.balance,
           monthlyPayment: d.monthlyPayment,
           interestRate: d.interestRate,
           status: d.status,
-          startDate: d.startDate.toISOString().split("T")[0],
-          endDate: d.endDate ? d.endDate.toISOString().split("T")[0] : "",
+          startDate: d.startDate ? d.startDate.split("T")[0] : "",
+          endDate: d.endDate ? d.endDate.split("T")[0] : "",
           notes: d.notes ?? "",
         }));
         const csv = toCSV(rows);
@@ -65,23 +67,24 @@ export async function GET(req: NextRequest) {
       }
 
       case "payments": {
-        const payments = await prisma.paymentCalendar.findMany({
-          orderBy: { dueDate: "desc" },
-          select: {
-            dueDate: true,
-            amount: true,
-            status: true,
-            paidDate: true,
-            notes: true,
-            debt: { select: { type: true } },
-          },
-        });
+        const payments = await db.select({
+          dueDate: paymentCalendarTable.dueDate,
+          amount: paymentCalendarTable.amount,
+          status: paymentCalendarTable.status,
+          paidDate: paymentCalendarTable.paidDate,
+          notes: paymentCalendarTable.notes,
+          debtType: debtTable.type,
+        })
+          .from(paymentCalendarTable)
+          .leftJoin(debtTable, eq(paymentCalendarTable.debtId, debtTable.id))
+          .orderBy(desc(paymentCalendarTable.dueDate))
+          .all();
         const rows = payments.map((p) => ({
-          debtType: p.debt?.type ?? "",
+          debtType: p.debtType ?? "",
           amount: p.amount,
-          dueDate: p.dueDate.toISOString().split("T")[0],
+          dueDate: p.dueDate ? p.dueDate.split("T")[0] : "",
           status: p.status,
-          paidDate: p.paidDate ? p.paidDate.toISOString().split("T")[0] : "",
+          paidDate: p.paidDate ? p.paidDate.split("T")[0] : "",
           notes: p.notes ?? "",
         }));
         const csv = toCSV(rows);
@@ -94,22 +97,22 @@ export async function GET(req: NextRequest) {
       }
 
       case "grab": {
-        const entries = await prisma.grabEntry.findMany({
-          orderBy: { date: "desc" },
-          select: {
-            date: true,
-            platform: true,
-            hours: true,
-            gross: true,
-            commission: true,
-            fuel: true,
-            tolls: true,
-            net: true,
-            notes: true,
-          },
-        });
+        const entries = await db.select({
+          date: grabEntryTable.date,
+          platform: grabEntryTable.platform,
+          hours: grabEntryTable.hours,
+          gross: grabEntryTable.gross,
+          commission: grabEntryTable.commission,
+          fuel: grabEntryTable.fuel,
+          tolls: grabEntryTable.tolls,
+          net: grabEntryTable.net,
+          notes: grabEntryTable.notes,
+        })
+          .from(grabEntryTable)
+          .orderBy(desc(grabEntryTable.date))
+          .all();
         const rows = entries.map((e) => ({
-          date: e.date.toISOString().split("T")[0],
+          date: e.date ? e.date.split("T")[0] : "",
           platform: e.platform,
           hours: e.hours,
           gross: e.gross,

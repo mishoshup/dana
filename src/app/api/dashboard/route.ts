@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { monthlyDashboard, grabEntry as grabEntryTable, paymentCalendar as paymentCalendarTable, debt as debtTable, subscription } from "@/db/schema";
+import { eq, and, gte, lte, lt, asc, desc, count, sum } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { z } from "zod";
 
@@ -37,62 +38,81 @@ export async function GET(req: NextRequest) {
     const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
     const nextMonthStart = new Date(year, month, 1);
 
-    // ── MonthlyDashboard entry (salary, freelance, estimates) ─────────
-    const dashboardEntry = await prisma.monthlyDashboard.findFirst({
-      where: {
-        month: {
-          gte: monthStart,
-          lt: nextMonthStart,
-        },
-      },
-    });
+    const monthStartStr = monthStart.toISOString();
+    const monthEndStr = monthEnd.toISOString();
+    const nextMonthStartStr = nextMonthStart.toISOString();
 
-    const salary = dashboardEntry?.salary ?? 0;
-    const freelanceIncome = dashboardEntry?.freelanceIncome ?? 0;
+    // ── MonthlyDashboard entry (salary, freelance, estimates) ─────────
+    const dashboardEntries = await db.select()
+      .from(monthlyDashboard)
+      .where(and(
+        gte(monthlyDashboard.month, monthStartStr),
+        lt(monthlyDashboard.month, nextMonthStartStr),
+      ))
+      .limit(1)
+      .all();
+    const dashboardEntry = dashboardEntries[0];
+
+    const salary = dashboardEntry?.salary ? Number(dashboardEntry.salary) : 0;
+    const freelanceIncome = dashboardEntry?.freelanceIncome ? Number(dashboardEntry.freelanceIncome) : 0;
 
     // ── Grab entries for this month ──────────────────────────────────
-    const grabEntries = await prisma.grabEntry.findMany({
-      where: {
-        date: { gte: monthStart, lte: monthEnd },
-      },
-    });
+    const grabEntries = await db.select()
+      .from(grabEntryTable)
+      .where(and(
+        gte(grabEntryTable.date, monthStartStr),
+        lte(grabEntryTable.date, monthEndStr),
+      ))
+      .all();
 
     const grabIncome = grabEntries.reduce(
-      (sum, g) => sum + (g.net ?? g.gross),
+      (gsum, g) => gsum + Number(g.net ?? g.gross),
       0
     );
     const grabsThisMonth = grabEntries.length;
 
     // ── PaymentCalendar entries due this month ────────────────────────
-    const monthPayments = await prisma.paymentCalendar.findMany({
-      where: {
-        dueDate: { gte: monthStart, lte: monthEnd },
-      },
-      orderBy: { dueDate: "asc" },
-      include: {
-        debt: { select: { type: true } },
-      },
-    });
+    const monthPayments = await db.select({
+      id: paymentCalendarTable.id,
+      debtId: paymentCalendarTable.debtId,
+      dueDate: paymentCalendarTable.dueDate,
+      amount: paymentCalendarTable.amount,
+      status: paymentCalendarTable.status,
+      paidDate: paymentCalendarTable.paidDate,
+      notes: paymentCalendarTable.notes,
+      createdAt: paymentCalendarTable.createdAt,
+      updatedAt: paymentCalendarTable.updatedAt,
+      debt: { type: debtTable.type },
+    })
+      .from(paymentCalendarTable)
+      .leftJoin(debtTable, eq(paymentCalendarTable.debtId, debtTable.id))
+      .where(and(
+        gte(paymentCalendarTable.dueDate, monthStartStr),
+        lte(paymentCalendarTable.dueDate, monthEndStr),
+      ))
+      .orderBy(asc(paymentCalendarTable.dueDate))
+      .all();
 
     const debtPayments = monthPayments.reduce(
-      (sum, p) => sum + p.amount,
+      (psum, p) => psum + Number(p.amount),
       0
     );
 
     // ── Active subscriptions total ───────────────────────────────────
-    const subscriptions = await prisma.subscription.findMany({
-      where: { active: true },
-    });
+    const subscriptions = await db.select()
+      .from(subscription)
+      .where(eq(subscription.active, true))
+      .all();
     const subscriptionsTotal = subscriptions.reduce(
-      (sum, s) => sum + s.cost,
+      (ssum, s) => ssum + Number(s.cost),
       0
     );
 
     // ── Estimated costs (food, fuel, tolls, grab costs) ──────────────
     const estimatedCosts = dashboardEntry
-      ? (dashboardEntry.food ?? 0) +
-        (dashboardEntry.fuelTolls ?? 0) +
-        (dashboardEntry.grabCosts ?? 0)
+      ? Number(dashboardEntry.food ?? 0) +
+        Number(dashboardEntry.fuelTolls ?? 0) +
+        Number(dashboardEntry.grabCosts ?? 0)
       : 850; // Default fallback if no dashboard entry
 
     // ── Aggregates ───────────────────────────────────────────────────
@@ -101,22 +121,37 @@ export async function GET(req: NextRequest) {
     const surplus = totalIncome - totalExpenses;
 
     // ── Active debts with this month's payments ──────────────────────
-    const activeDebts = await prisma.debt.findMany({
-      where: { status: "active" },
-      include: {
-        payments: {
-          where: {
-            dueDate: { gte: monthStart, lte: monthEnd },
-          },
-        },
-      },
-    });
+    const activeDebts = await db.select()
+      .from(debtTable)
+      .where(eq(debtTable.status, "active"))
+      .all();
+
+    // Get this month's payments for active debts (separate query)
+    const activeDebtIds = activeDebts.map((d) => d.id);
+    const activeDebtPayments = activeDebtIds.length > 0
+      ? await db.select()
+          .from(paymentCalendarTable)
+          .where(and(
+            gte(paymentCalendarTable.dueDate, monthStartStr),
+            lte(paymentCalendarTable.dueDate, monthEndStr),
+          ))
+          .all()
+      : [];
+
+    // Group by debtId
+    const paymentsByDebtId: Record<string, typeof activeDebtPayments> = {};
+    for (const p of activeDebtPayments) {
+      const key = p.debtId!;
+      if (!paymentsByDebtId[key]) paymentsByDebtId[key] = [];
+      paymentsByDebtId[key].push(p);
+    }
 
     const debts = activeDebts.map((d) => ({
+      id: d.id,
       type: d.type,
-      balance: d.balance,
-      monthlyPayment: d.monthlyPayment,
-      paid: d.payments.reduce((sum, p) => sum + p.amount, 0),
+      balance: Number(d.balance),
+      monthlyPayment: Number(d.monthlyPayment),
+      paid: (paymentsByDebtId[d.id] || []).reduce((ps, p) => ps + Number(p.amount), 0),
       endDate: d.endDate,
     }));
 
@@ -127,7 +162,7 @@ export async function GET(req: NextRequest) {
       .map((p) => ({
         id: p.id,
         amount: p.amount,
-        dueDate: p.dueDate.toISOString(),
+        dueDate: p.dueDate,
         status: p.status,
         debt: p.debt,
       }));
@@ -147,9 +182,7 @@ export async function GET(req: NextRequest) {
       upcomingPayments,
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Dashboard database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { subscription } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { subscriptionUpdateSchema } from "@/lib/validation";
 
@@ -32,24 +33,27 @@ export async function PATCH(
     }
 
     const data = parsed.data;
-    const subscription = await prisma.subscription.update({
-      where: { id },
-      data: {
+    const [updatedSubscription] = await db.update(subscription)
+      .set({
         ...(data.name !== undefined && { name: data.name }),
         ...(data.cost !== undefined && { cost: data.cost }),
         ...(data.category !== undefined && { category: data.category }),
         ...(data.rating !== undefined && { rating: data.rating }),
         ...(data.active !== undefined && { active: data.active }),
-        ...(data.renewalDate !== undefined && { renewalDate: data.renewalDate ? new Date(data.renewalDate) : null }),
+        ...(data.renewalDate !== undefined && { renewalDate: data.renewalDate ? new Date(data.renewalDate).toISOString() : null }),
         ...(data.notes !== undefined && { notes: data.notes }),
-      },
-    });
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(subscription.id, id))
+      .returning();
 
-    return NextResponse.json(subscription);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    if (!updatedSubscription) {
+      return NextResponse.json({ error: "Subscription not found" }, { status: 404 });
     }
+
+    return NextResponse.json(updatedSubscription);
+  } catch (error) {
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

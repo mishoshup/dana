@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { paymentCalendar as paymentCalendarTable, debt as debtTable } from "@/db/schema";
+import { eq, desc, asc } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { paymentSchema, paymentUpdateSchema } from "@/lib/validation";
 
@@ -9,20 +10,26 @@ export async function GET() {
   if (authError) return authError;
 
   try {
-    const payments = await prisma.paymentCalendar.findMany({
-      orderBy: { dueDate: "asc" },
-      take: 50,
-      include: {
-        debt: {
-          select: { type: true },
-        },
-      },
-    });
+    const payments = await db.select({
+      id: paymentCalendarTable.id,
+      debtId: paymentCalendarTable.debtId,
+      dueDate: paymentCalendarTable.dueDate,
+      amount: paymentCalendarTable.amount,
+      status: paymentCalendarTable.status,
+      paidDate: paymentCalendarTable.paidDate,
+      notes: paymentCalendarTable.notes,
+      createdAt: paymentCalendarTable.createdAt,
+      updatedAt: paymentCalendarTable.updatedAt,
+      debt: { type: debtTable.type },
+    })
+      .from(paymentCalendarTable)
+      .leftJoin(debtTable, eq(paymentCalendarTable.debtId, debtTable.id))
+      .orderBy(asc(paymentCalendarTable.dueDate))
+      .limit(50)
+      .all();
     return NextResponse.json(payments);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -49,21 +56,19 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
-    const payment = await prisma.paymentCalendar.create({
-      data: {
-        debtId: data.debtId ?? null,
-        dueDate: new Date(data.dueDate),
-        amount: data.amount,
-        status: data.status,
-        paidDate: data.paidDate ? new Date(data.paidDate) : null,
-        notes: data.notes ?? null,
-      },
-    });
+    const [payment] = await db.insert(paymentCalendarTable).values({
+      id: crypto.randomUUID(),
+      debtId: data.debtId ?? null,
+      dueDate: new Date(data.dueDate).toISOString(),
+      amount: data.amount,
+      status: data.status,
+      paidDate: data.paidDate ? new Date(data.paidDate).toISOString() : null,
+      notes: data.notes ?? null,
+      updatedAt: new Date().toISOString(),
+    }).returning();
     return NextResponse.json(payment, { status: 201 });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
@@ -91,28 +96,29 @@ export async function PATCH(req: NextRequest) {
 
     const data = parsed.data;
 
-    const existing = await prisma.paymentCalendar.findUnique({
-      where: { id: data.id },
-    });
-    if (!existing) {
+    const existing = await db.select()
+      .from(paymentCalendarTable)
+      .where(eq(paymentCalendarTable.id, data.id))
+      .limit(1)
+      .all();
+    if (existing.length === 0) {
       return NextResponse.json(
         { error: "Payment not found" },
         { status: 404 }
       );
     }
 
-    const payment = await prisma.paymentCalendar.update({
-      where: { id: data.id },
-      data: {
+    const [payment] = await db.update(paymentCalendarTable)
+      .set({
         ...(data.status !== undefined && { status: data.status }),
-        ...(data.paidDate !== undefined && { paidDate: data.paidDate ? new Date(data.paidDate) : null }),
-      },
-    });
+        ...(data.paidDate !== undefined && { paidDate: data.paidDate ? new Date(data.paidDate).toISOString() : null }),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(paymentCalendarTable.id, data.id))
+      .returning();
     return NextResponse.json(payment);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

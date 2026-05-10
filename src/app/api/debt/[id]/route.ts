@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { debt as debtTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { debtUpdateSchema } from "@/lib/validation";
 
@@ -31,23 +32,26 @@ export async function PATCH(
     }
 
     const data = parsed.data;
-    const debt = await prisma.debt.update({
-      where: { id },
-      data: {
+    const [debt] = await db.update(debtTable)
+      .set({
         ...(data.type !== undefined && { type: data.type }),
         ...(data.balance !== undefined && { balance: data.balance }),
         ...(data.monthlyPayment !== undefined && { monthlyPayment: data.monthlyPayment }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.notes !== undefined && { notes: data.notes }),
-        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
-      },
-    });
+        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate).toISOString() : null }),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(debtTable.id, id))
+      .returning();
+
+    if (!debt) {
+      return NextResponse.json({ error: "Debt not found" }, { status: 404 });
+    }
 
     return NextResponse.json(debt);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
@@ -64,12 +68,10 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    await prisma.debt.delete({ where: { id } });
+    await db.delete(debtTable).where(eq(debtTable.id, id));
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

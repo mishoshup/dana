@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { debt as debtTable, paymentCalendar as paymentCalendarTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 
 export async function POST(
@@ -24,7 +25,8 @@ export async function POST(
     }
 
     // Validate debt exists
-    const debt = await prisma.debt.findUnique({ where: { id } });
+    const debts = await db.select().from(debtTable).where(eq(debtTable.id, id)).limit(1).all();
+    const debt = debts[0];
     if (!debt) {
       return NextResponse.json({ error: "Debt not found" }, { status: 404 });
     }
@@ -36,41 +38,44 @@ export async function POST(
       );
     }
 
+    const currentBalance = Number(debt.balance);
+
     // Atomic transaction: log payment + update balance
-    const [payment, updatedDebt] = await prisma.$transaction([
-      prisma.paymentCalendar.create({
-        data: {
-          debtId: id,
-          dueDate: new Date(body.date ?? new Date()),
-          amount: Math.min(amount, debt.balance),
-          status: "paid",
-          paidDate: new Date(),
-          notes: body.notes ?? null,
-        },
-      }),
-      prisma.debt.update({
-        where: { id },
-        data: {
-          balance: Math.max(0, debt.balance - amount),
-          status: debt.balance - amount <= 0 ? "paid" : "active",
-        },
-      }),
-    ]);
+    const result = await db.transaction(async (tx) => {
+      const [payment] = await tx.insert(paymentCalendarTable).values({
+        id: crypto.randomUUID(),
+        debtId: id,
+        dueDate: new Date(body.date ?? new Date()).toISOString(),
+        amount: Math.min(amount, currentBalance),
+        status: "paid",
+        paidDate: new Date().toISOString(),
+        notes: body.notes ?? null,
+        updatedAt: new Date().toISOString(),
+      }).returning();
+
+      const [updatedDebt] = await tx.update(debtTable)
+        .set({
+          balance: Math.max(0, currentBalance - amount),
+          status: currentBalance - amount <= 0 ? "paid" : "active",
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(debtTable.id, id))
+        .returning();
+
+      return { payment, updatedDebt };
+    });
 
     return NextResponse.json(
       {
-        payment,
-        debt: updatedDebt,
-        remaining: Math.max(0, debt.balance - amount),
-        fullyPaid: debt.balance - amount <= 0,
+        payment: result.payment,
+        debt: result.updatedDebt,
+        remaining: Math.max(0, currentBalance - amount),
+        fullyPaid: currentBalance - amount <= 0,
       },
       { status: 201 }
     );
   } catch (error) {
     console.error("Payment log error:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

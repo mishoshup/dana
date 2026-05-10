@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { db } from "@/db/local";
+import { debt as debtTable, paymentCalendar as paymentCalendarTable } from "@/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
 import { requireAuthTuple } from "@/lib/auth-helpers";
 import { debtSchema } from "@/lib/validation";
 
@@ -9,20 +10,35 @@ export async function GET() {
   if (authError) return authError;
 
   try {
-    const debts = await prisma.debt.findMany({
-      orderBy: { balance: "desc" },
-      include: {
-        payments: {
-          orderBy: { dueDate: "desc" },
-          take: 5,
-        },
-      },
-    });
+    const debtList = await db.select().from(debtTable)
+      .orderBy(desc(debtTable.balance))
+      .all();
+
+    // Payments need a separate query (Drizzle doesn't have Prisma's include)
+    const debtIds = debtList.map((d) => d.id);
+    const allPayments = debtIds.length > 0
+      ? await db.select().from(paymentCalendarTable)
+          .where(inArray(paymentCalendarTable.debtId, debtIds))
+          .orderBy(desc(paymentCalendarTable.dueDate))
+          .all()
+      : [];
+
+    // Group payments by debtId, take first 5 per debt
+    const paymentsByDebt: Record<string, typeof allPayments> = {};
+    for (const p of allPayments) {
+      const key = p.debtId!;
+      if (!paymentsByDebt[key]) paymentsByDebt[key] = [];
+      paymentsByDebt[key].push(p);
+    }
+
+    const debts = debtList.map((d) => ({
+      ...d,
+      payments: (paymentsByDebt[d.id] || []).slice(0, 5),
+    }));
+
     return NextResponse.json(debts);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -49,24 +65,22 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
-    const debt = await prisma.debt.create({
-      data: {
-        type: data.type,
-        balance: data.balance,
-        monthlyPayment: data.monthlyPayment,
-        interestRate: data.interestRate ?? null,
-        startDate: new Date(data.startDate || new Date()),
-        endDate: data.endDate ? new Date(data.endDate) : null,
-        status: data.status,
-        notes: data.notes ?? null,
-      },
-    });
+    const [debt] = await db.insert(debtTable).values({
+      id: crypto.randomUUID(),
+      type: data.type,
+      balance: data.balance,
+      monthlyPayment: data.monthlyPayment,
+      interestRate: data.interestRate ?? null,
+      startDate: new Date(data.startDate || new Date()).toISOString(),
+      endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
+      status: data.status,
+      notes: data.notes ?? null,
+      updatedAt: new Date().toISOString(),
+    }).returning();
 
     return NextResponse.json(debt, { status: 201 });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
+    console.error("Database error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
