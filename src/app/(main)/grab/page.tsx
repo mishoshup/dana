@@ -56,7 +56,7 @@ export default function GrabPage() {
       setError(null);
       const res = await fetch("/api/grab");
       if (!res.ok) throw new Error("Failed to fetch entries");
-      const data = await res.json();
+      const data: GrabEntry[] = await res.json();
       setEntries(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load entries");
@@ -78,7 +78,7 @@ export default function GrabPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err: { error?: string } = await res.json();
         throw new Error(err.error || "Failed to save entry");
       }
 

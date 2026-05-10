@@ -45,7 +45,7 @@ export default function PaymentsPage() {
       try {
         const r = await fetch("/api/payments");
         if (!r.ok) throw new Error("Failed to fetch");
-        const data = await r.json();
+        const data: Payment[] = await r.json();
         setPayments(data);
       } catch {
         setError("Could not load payments");

@@ -2,6 +2,11 @@
 
 import { useState, FormEvent } from "react";
 
+interface ApiErrorResponse {
+  message?: string;
+  error?: string;
+}
+
 export default function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,7 +26,7 @@ export default function RegisterForm() {
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await res.json();
+      const data: ApiErrorResponse = await res.json();
 
       if (!res.ok) {
         setError(data.message || data.error || "Registration failed");

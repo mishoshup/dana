@@ -12,7 +12,7 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const body = await req.json();
+    const body: { amount: string; date?: string; notes?: string } = await req.json();
 
     // Validate amount
     const amount = parseFloat(body.amount);
@@ -41,11 +41,11 @@ export async function POST(
       prisma.paymentCalendar.create({
         data: {
           debtId: id,
-          dueDate: new Date(body.date || new Date()),
+          dueDate: new Date(body.date ?? new Date()),
           amount: Math.min(amount, debt.balance),
           status: "paid",
           paidDate: new Date(),
-          notes: body.notes || null,
+          notes: body.notes ?? null,
         },
       }),
       prisma.debt.update({

@@ -76,7 +76,7 @@ export default function DebtTracker() {
       setLoading(true);
       const res = await fetch("/api/debt");
       if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
+      const data: Debt[] = await res.json();
       setDebts(data);
     } catch (e) {
       setError("Failed to load debts");
@@ -98,11 +98,11 @@ export default function DebtTracker() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err: { error?: string } = await res.json();
         throw new Error(err.error || "Payment failed");
       }
 
-      const result = await res.json();
+      const result: { fullyPaid?: boolean; remaining: number } = await res.json();
       setPaySuccess(
         result.fullyPaid
           ? "🎉 Debt fully paid off!"
